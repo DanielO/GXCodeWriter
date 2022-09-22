@@ -15,11 +15,11 @@ import UM.PluginRegistry
 gxcode_header_fmt = '<16sIIIIIIIHHHHHHH'
 
 class GXCodeWriter(UM.Mesh.MeshWriter.MeshWriter):
+    # Need to run on the Qt thread otherwise grabbing snapshots won't work
     @call_on_qt_thread
     def write(self, stream, node, mode):
         try:
             self.dowrite(stream)
-            Logger.log('w', 'Wrote OK')
             return True
         except Exception as e:
             Logger.log('e', 'Unable to write file: %s' % (e))
@@ -41,6 +41,8 @@ class GXCodeWriter(UM.Mesh.MeshWriter.MeshWriter):
         bmpofs = struct.calcsize(gxcode_header_fmt)
         pngofs = bmpofs + bmpsize
         gcodeofs = pngofs + pngsize
+
+        # Other header parameters
         unk2 = 0
         ptime = 500
         filusage = 500
@@ -52,15 +54,20 @@ class GXCodeWriter(UM.Mesh.MeshWriter.MeshWriter):
         extemp = 210
         ex2temp = 210
         unk5 = 0
+
+        # Assemble header blob
         hdr = struct.pack(gxcode_header_fmt, b'xgcode 1.0\n\x00\x00\x00\x00\x00',
                           bmpofs, pngofs, gcodeofs, unk2, ptime, filusage, unk3,
                           unk4, nshells, pspeed, ptemp, extemp, ex2temp, unk5)
+
+        # Write everything out
         stream.write(hdr)
         stream.write(bmpsnap)
         stream.write(pngsnap)
         stream.write(bytes(gcode_data, 'ascii'))
 
     def getsnap(self, width, height, fmt):
+        '''Helper function to create a snapshot image in the requested format and return it as a binary string'''
         snap = Snapshot.snapshot(width = width, height = height)
         if snap is None:
             return b''
